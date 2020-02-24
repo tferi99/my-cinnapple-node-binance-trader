@@ -32,7 +32,17 @@ const APISECRET = config.apiSecret
 console.log('Config:', config)
 //////////////////////////////////////////////////////////////////////////////////
 
+// default values
+const DEFAULT_BASE_CURRENCY = "USDT"
+const DEFAULT_BUDGET =  1.00
+const DEFAULT_FIXED_BUY_PRICE = 0.00
+const DEFAULT_CURRENCY_TO_BUY = "BTC"
+const DEFAULT_PROFIT_POURCENT = 0.80
+const DEFAULT_LOSS_POURCENT = 0.40
+const DEFAULT_TRAILING_POURCENT = 0.40
+
 const STEP_INITIAL = 0
+const STEP_BEFORE_ORDER_COMPLETED = 1
 const STEP_STOP_LOSS_SELL_INITED = 3
 const STEP_END = 99
 
@@ -62,13 +72,13 @@ let init_buy_filled = false
 const client = binance({apiKey: APIKEY, apiSecret: APISECRET, useServerTime: true})
 
 const conf = new Configstore('nbt')
-let base_currency = conf.get('nbt.base_currency')?conf.get('nbt.base_currency'):"USDT"
-let budget = conf.get('nbt.budget')?parseFloat(conf.get('nbt.budget')):1.00
-let fixed_buy_price = conf.get('nbt.fixed_buy_price')?parseFloat(conf.get('nbt.fixed_buy_price')):0.00
-let currency_to_buy = conf.get('nbt.currency_to_buy')?conf.get('nbt.currency_to_buy'):"BTC"
-let profit_pourcent = conf.get('nbt.profit_pourcent')?conf.get('nbt.profit_pourcent'):0.80
-let loss_pourcent = conf.get('nbt.loss_pourcent')?conf.get('nbt.loss_pourcent'):0.40
-let trailing_pourcent = conf.get('nbt.trailing_pourcent')?conf.get('nbt.trailing_pourcent'):0.40
+let base_currency = conf.get('nbt.base_currency') ? conf.get('nbt.base_currency') : DEFAULT_BASE_CURRENCY
+let budget = conf.get('nbt.budget') ? parseFloat(conf.get('nbt.budget')) : DEFAULT_BUDGET
+let fixed_buy_price = conf.get('nbt.fixed_buy_price') ? parseFloat(conf.get('nbt.fixed_buy_price')) : DEFAULT_FIXED_BUY_PRICE
+let currency_to_buy = conf.get('nbt.currency_to_buy') ? conf.get('nbt.currency_to_buy') : DEFAULT_CURRENCY_TO_BUY
+let profit_pourcent = conf.get('nbt.profit_pourcent') ? conf.get('nbt.profit_pourcent') : DEFAULT_PROFIT_POURCENT
+let loss_pourcent = conf.get('nbt.loss_pourcent') ? conf.get('nbt.loss_pourcent') : DEFAULT_LOSS_POURCENT
+let trailing_pourcent = conf.get('nbt.trailing_pourcent') ? conf.get('nbt.trailing_pourcent') : DEFAULT_TRAILING_POURCENT
 
 clear()
 
@@ -136,9 +146,16 @@ ask_pair_budget = () => {
         let priceFilterArr = _.filter(symbol.filters, {filterType: 'PRICE_FILTER'})
         if (!priceFilterArr.length) {
           console.log(chalk.red('SymbolFilter(\'PRICE_FILTER\' not found in symbol: ' + symbol.symbol))
-          process.exit
+          process.exit(1);
         }
-        let lotSizeFilter = _.filter(symbol.filters, {filterType: 'LOT_SIZE'})[0]
+        let priceFilter = priceFilterArr[0];
+
+        let lotSizeFilterArr = _.filter(symbol.filters, {filterType: 'LOT_SIZE'})
+        if (!lotSizeFilterArr.length) {
+          console.log(chalk.red('SymbolFilter(\'LOT_SIZE\' not found in symbol: ' + symbol.symbol))
+          process.exit(1);
+        }
+        let lotSizeFilter = lotSizeFilterArr[0]
 
         //console.log('Symbol:', symbol)
         console.log('[0]', symbol.filters[0])
@@ -409,7 +426,7 @@ start_trading = () => {
 }
 
 auto_trade = () => {
-  step = 1
+  step = STEP_BEFORE_ORDER_COMPLETED
   report.text = ""
   report.start()
   // LISTEN TO KEYBOARD PRSEED KEYS
@@ -426,7 +443,7 @@ auto_trade = () => {
     report.text = add_status_to_trade_report(trade, "")
 
     // CHECK IF INITIAL BUY ORDER IS EXECUTED
-    if ( order_id && (step === 1) ) {
+    if ( order_id && (step === STEP_BEFORE_ORDER_COMPLETED) ) {
       step = STEP_END
       checkBuyOrderStatus()
     }
@@ -626,7 +643,7 @@ checkBuyOrderStatus = () => {
     else {
       console.log(chalk.gray(" BUY ORDER NOT YET FULLY EXECUTED "))
       init_buy_filled = false
-      step = 1
+      step = STEP_BEFORE_ORDER_COMPLETED
     }
   })
 }
