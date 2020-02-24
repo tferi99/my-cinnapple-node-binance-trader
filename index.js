@@ -21,14 +21,20 @@ const Configstore = require('configstore')
 const binance     = require('binance-api-node').default
 const inquirer    = require("inquirer")
 const setTitle    = require('node-bash-title')
+var config        = require('/tmp/.my-cinnapple-node-binance-trader-config.json');
 
 //////////////////////////////////////////////////////////////////////////////////
 // https://www.binance.com/restapipub.html
 // REPLACE xxx with your own API key key and secret.
 //
-const APIKEY = 'XXXX'
-const APISECRET = 'XXXX'
+const APIKEY = config.apiKey
+const APISECRET = config.apiSecret
+console.log('Config:', config)
 //////////////////////////////////////////////////////////////////////////////////
+
+const STEP_INITIAL = 0
+const STEP_STOP_LOSS_SELL_INITED = 3
+const STEP_END = 99
 
 let pnl = 0
 let step = 0
@@ -122,11 +128,31 @@ ask_pair_budget = () => {
     buy_info_request[2].default  = currency_to_buy
     // FIND OUT IF PAIR EXISTS AND THE PAIR QUOTE INFO:
     client.exchangeInfo().then(results => {
+      //console.log('Exchange info:', results)
+
       // CHECK IF PAIR IS UNKNOWN:
       if (_.filter(results.symbols, {symbol: pair}).length > 0) {
+        let symbol = _.filter(results.symbols, {symbol: pair})[0]
+        let priceFilterArr = _.filter(symbol.filters, {filterType: 'PRICE_FILTER'})
+        if (!priceFilterArr.length) {
+          console.log(chalk.red('SymbolFilter(\'PRICE_FILTER\' not found in symbol: ' + symbol.symbol))
+          process.exit
+        }
+        let lotSizeFilter = _.filter(symbol.filters, {filterType: 'LOT_SIZE'})[0]
+
+        //console.log('Symbol:', symbol)
+        console.log('[0]', symbol.filters[0])
+        console.log('X', priceFilter)
+        console.log('[2]', symbol.filters[2])
+        console.log('[Y]', lotSizeFilter)
+
         setTitle('🐬 ' + pair + ' 🐬 ')
         tickSize = _.filter(results.symbols, {symbol: pair})[0].filters[0].tickSize.indexOf("1") - 1
         stepSize = _.filter(results.symbols, {symbol: pair})[0].filters[2].stepSize
+/*        tickSize = priceFilter.tickSize.indexOf("1") - 1
+        stepSize = symbol.filters[2].stepSize*/
+        console.log(`tickSize: ${tickSize}; stepSize: ${stepSize}`)
+
         // GET ORDER BOOK
         client.book({ symbol: pair }).then(results => {
           // SO WE CAN TRY TO BUY AT THE 1ST BID PRICE + %0.02:
@@ -394,18 +420,20 @@ auto_trade = () => {
   const curr_trade = trade_count
   const clean_trades = client.ws.trades([pair], trade => {
 
-    if (curr_trade !== trade_count) clean_trades()
+    if (curr_trade !== trade_count) {
+        clean_trades()    // stop WS
+    }
     report.text = add_status_to_trade_report(trade, "")
 
     // CHECK IF INITIAL BUY ORDER IS EXECUTED
     if ( order_id && (step === 1) ) {
-      step = 99
+      step = STEP_END
       checkBuyOrderStatus()
     }
 
     // SWITCH PRICE REACHED SETTING UP SELL FOR PROFIT ORDER
-    if ( (selling_method === "Profit") && order_id && (step === 3) && (trade.price > switch_price) ) {
-      step = 99
+    if ( (selling_method === "Profit") && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
+      step = STEP_END
       console.log(chalk.grey(" CANCEL STOP LOSS AND GO FOR PROFIT "))
       client.cancelOrder({
         symbol: pair,
@@ -438,8 +466,8 @@ auto_trade = () => {
     }
 
     // INCREASE THE TRAILING STOP LOSS PRICE
-    if ( (selling_method === "Trailing") && order_id && (step === 3) && (trade.price > switch_price) ) {
-      step = 99
+    if ( (selling_method === "Trailing") && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
+      step = STEP_END
       tot_cancel = tot_cancel + 1
       console.log(chalk.grey(" CANCEL CURRENT STOP LOSS "))
       client.cancelOrder({
@@ -453,7 +481,7 @@ auto_trade = () => {
         set_stop_loss_order()
         switch_price = (parseFloat(switch_price) + (parseFloat(switch_price) * trailing_pourcent / 100.00)).toFixed(tickSize)
         console.log(chalk.grey(" NEW TRAILING STOP LOSS SET @ " + stop_price))
-        step = 3
+        step = STEP_STOP_LOSS_SELL_INITED
       })
       .catch((error) => {
         console.log(" ERROR #547 ")
@@ -461,9 +489,9 @@ auto_trade = () => {
       })
     }
 
-    // PRICE BELLOW BUY PRICE SETTING UP STOP LOSS ORDER
+    // PRICE BELOW BUY PRICE SETTING UP STOP LOSS ORDER
     if ( (selling_method==='Profit') && order_id && (step === 5) && (trade.price < buy_price) ) {
-      step = 99
+      step = STEP_END
       console.log(chalk.grey(" CANCEL PROFIT SETTING UP STOP LOSS "))
       tot_cancel = tot_cancel + 1
       client.cancelOrder({
@@ -485,7 +513,7 @@ auto_trade = () => {
 
     // CURRENT PRICE REACHED SELL PRICE
     if ( (selling_method === "Profit") && order_id && (step === 5) && (trade.price >= sell_price) ) {
-      step = 99
+      step = STEP_END
       client.getOrder({
         symbol: pair,
         orderId: order_id,
@@ -498,7 +526,7 @@ auto_trade = () => {
           step = 5
         }
         else {
-          clean_trades()
+          clean_trades()  // stop WS
           pnl = 100.00*(trade.price - buy_price)/buy_price
           var log_report = chalk.greenBright(" 🐬 !!! WE HAVE A WINNER !!! 🐬 ")
           report.text = add_status_to_trade_report(trade, log_report)
@@ -513,8 +541,8 @@ auto_trade = () => {
     }
 
     // CURRENT PRICE REACHED STOP PRICE
-    if ( order_id && (step === 3) && (trade.price <= stop_price) ) {
-      step = 99
+    if ( order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price <= stop_price) ) {
+      step = STEP_END
       client.getOrder({
         symbol: pair,
         orderId: order_id,
@@ -527,7 +555,7 @@ auto_trade = () => {
           step = 5
         }
         else {
-          clean_trades()
+          clean_trades()  // stop WS
           pnl = 100.00*(buy_price - trade.price)/buy_price
           var log_report = chalk.magenta(" STOP LOSS ALL EXECUTED")
           report.text = add_status_to_trade_report(trade, log_report)
@@ -538,7 +566,7 @@ auto_trade = () => {
       })
       .catch((error) => {
         console.error(" API ERROR #9 " + error)
-        clean_trades()
+        clean_trades()  // stop WS
         pnl = 100.00*(buy_price - trade.price)/buy_price
         var log_report = chalk.magenta(" TRADE STOPPED ")
         report.text = add_status_to_trade_report(trade, log_report)
@@ -617,7 +645,7 @@ set_stop_loss_order = () => {
     order_id = order.orderId
     var log_report = chalk.grey(" STOP LOSS READY (" + tot_cancel + ") @ ") + chalk.cyan(stop_price)
     console.log(log_report)
-    step = 3
+    step = STEP_STOP_LOSS_SELL_INITED
   })
   .catch((error) => {
     console.error(" ERRROR #1233 STOP PRICE (" + stop_price + ") " + error )
@@ -644,7 +672,7 @@ add_status_to_trade_report = (trade, status) => {
 }
 
 reset_trade = () => {
-  step = 0
+  step = STEP_INITIAL
   trade_count = trade_count + 1
   order_id = 0
   buy_price  = 0.00
