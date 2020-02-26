@@ -153,22 +153,24 @@ ask_pair_budget = () => {
         let lotSizeFilterArr = _.filter(symbol.filters, {filterType: 'LOT_SIZE'})
         if (!lotSizeFilterArr.length) {
           console.log(chalk.red('SymbolFilter(\'LOT_SIZE\' not found in symbol: ' + symbol.symbol))
-          process.exit(1);
+          process.exit(2);
         }
         let lotSizeFilter = lotSizeFilterArr[0]
 
         //console.log('Symbol:', symbol)
-        console.log('[0]', symbol.filters[0])
-        console.log('X', priceFilter)
-        console.log('[2]', symbol.filters[2])
-        console.log('[Y]', lotSizeFilter)
+        //console.log('[0]', symbol.filters[0])
+        //console.log('X', priceFilter)
+        //console.log('[2]', symbol.filters[2])
+        //console.log('[Y]', lotSizeFilter)
 
         setTitle('🐬 ' + pair + ' 🐬 ')
         tickSize = _.filter(results.symbols, {symbol: pair})[0].filters[0].tickSize.indexOf("1") - 1
         stepSize = _.filter(results.symbols, {symbol: pair})[0].filters[2].stepSize
-/*        tickSize = priceFilter.tickSize.indexOf("1") - 1
-        stepSize = symbol.filters[2].stepSize*/
+        let tickSize2 = priceFilter.tickSize.indexOf("1") - 1
+        let stepSize2 = symbol.filters[2].stepSize
+
         console.log(`tickSize: ${tickSize}; stepSize: ${stepSize}`)
+        console.log(`tickSize2: ${tickSize2}; stepSize2: ${stepSize2}`)
 
         // GET ORDER BOOK
         client.book({ symbol: pair }).then(results => {
