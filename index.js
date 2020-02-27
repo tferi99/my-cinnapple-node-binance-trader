@@ -58,13 +58,22 @@ let stop_price = 0.00
 let loss_price = 0.00
 let sell_price = 0.00
 let buy_amount = 0.00
-let stepSize = 0
-let tickSize = 8
+let stepSize = 0            //
+let tickSize = 8            // Tick size is the minimum price movement of a trading instrument.
 let tot_cancel = 0
 let pair = ""
 let buying_method = ""
 let selling_method = ""
 let init_buy_filled = false
+
+// buying method
+const BUY_FIXED = "Fixed"
+const BUY_BID = "Bid"
+const BUY_MARKET = "Market"
+
+// selling methods
+const SELL_PROFIT = "Profit"
+const SELL_TRAILING = "Trailing"
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -212,31 +221,31 @@ ask_buy_sell_options = () => {
   inquirer.prompt(buy_sell_options).then(answers => {
     if (answers.buy_option.includes("Market")) {
       // MARKET PRICE BUY //
-      buying_method = "Market"
+      buying_method = BUY_MARKET
       if (answers.sell_option.includes("Trailing")) {
-        selling_method = "Trailing"
+        selling_method = SELL_TRAILING
         ask_trailing_percent()
       }
       else {
-        selling_method = "Profit"
+        selling_method = SELL_PROFIT
         ask_loss_profit_percents()
       }
     }
     if (answers.buy_option.includes("Bid")) {
       // BID PRICE BUY //
-      buying_method = "Bid"
+      buying_method = BUY_BID
       if (answers.sell_option.includes("Trailing")) {
-        selling_method = "Trailing"
+        selling_method = SELL_TRAILING
         ask_trailing_percent()
       }
       else {
-        selling_method = "Profit"
+        selling_method = SELL_PROFIT
         ask_loss_profit_percents()
       }
     }
     if (answers.buy_option.includes("Fixed")) {
       // FIXED PRICE BUY //
-      buying_method = "Fixed"
+      buying_method = BUY_FIXED
       ask_fixed_buy_price(answers.sell_option)
     }
   })
@@ -264,11 +273,11 @@ ask_fixed_buy_price = (sell_option) => {
     fixed_buy_price_input[0].default = fixed_buy_price
     console.log(chalk.grey("The bot will set a buy order at " + fixed_buy_price))
     if (sell_option.includes("Trailing")) {
-      selling_method = "Trailing"
+      selling_method = SELL_TRAILING
       ask_trailing_percent()
     }
     else {
-      selling_method = "Profit"
+      selling_method = SELL_PROFIT
       ask_loss_profit_percents()
     }
   })
@@ -362,7 +371,7 @@ ask_trailing_percent = () => {
 
 start_trading = () => {
   var precision = stepSize.toString().split('.')[1].length || 0
-  if (buying_method === "Fixed") {
+  if (buying_method === BUY_FIXED) {
     buy_amount = (( ((budget / fixed_buy_price) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
     buy_price = parseFloat(fixed_buy_price)
     console.log(chalk.grey("BUYING " + buy_amount + " OF " + currency_to_buy + " AT FIXED PRICE ") + chalk.green(buy_price.toFixed(tickSize)))
@@ -383,7 +392,7 @@ start_trading = () => {
       ask_pair_budget()
     })
   }
-  else if (buying_method === "Bid") {
+  else if (buying_method === BUY_BID) {
     buy_amount = (( ((parseFloat(budget) / (parseFloat(bid_price) * 1.0002)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
     buy_price = parseFloat(bid_price) * 1.0002
     console.log(chalk.grey("BUYING " + buy_amount + " OF " + currency_to_buy + " AT JUST ABOVE 1ST BID PRICE ") + chalk.green(buy_price.toFixed(tickSize)))
@@ -404,7 +413,7 @@ start_trading = () => {
       ask_pair_budget()
     })
   }
-  else if (buying_method === "Market") {
+  else if (buying_method === BUY_MARKET) {
     buy_amount = (( ((parseFloat(budget) / (parseFloat(ask_price) * 1.0002)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
     buy_price = parseFloat(ask_price)
     console.log(chalk.green("BUYING " + buy_amount + " OF " + currency_to_buy + " AT MARKET PRICE" ))
@@ -451,7 +460,7 @@ auto_trade = () => {
     }
 
     // SWITCH PRICE REACHED SETTING UP SELL FOR PROFIT ORDER
-    if ( (selling_method === "Profit") && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
+    if ( (selling_method === SELL_PROFIT) && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
       step = STEP_END
       console.log(chalk.grey(" CANCEL STOP LOSS AND GO FOR PROFIT "))
       client.cancelOrder({
@@ -485,7 +494,7 @@ auto_trade = () => {
     }
 
     // INCREASE THE TRAILING STOP LOSS PRICE
-    if ( (selling_method === "Trailing") && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
+    if ( (selling_method === SELL_TRAILING) && order_id && (step === STEP_STOP_LOSS_SELL_INITED) && (trade.price > switch_price) ) {
       step = STEP_END
       tot_cancel = tot_cancel + 1
       console.log(chalk.grey(" CANCEL CURRENT STOP LOSS "))
@@ -509,7 +518,7 @@ auto_trade = () => {
     }
 
     // PRICE BELOW BUY PRICE SETTING UP STOP LOSS ORDER
-    if ( (selling_method==='Profit') && order_id && (step === 5) && (trade.price < buy_price) ) {
+    if ( (selling_method === SELL_PROFIT) && order_id && (step === 5) && (trade.price < buy_price) ) {
       step = STEP_END
       console.log(chalk.grey(" CANCEL PROFIT SETTING UP STOP LOSS "))
       tot_cancel = tot_cancel + 1
@@ -531,7 +540,7 @@ auto_trade = () => {
     }
 
     // CURRENT PRICE REACHED SELL PRICE
-    if ( (selling_method === "Profit") && order_id && (step === 5) && (trade.price >= sell_price) ) {
+    if ( (selling_method === SELL_PROFIT) && order_id && (step === 5) && (trade.price >= sell_price) ) {
       step = STEP_END
       client.getOrder({
         symbol: pair,
@@ -627,7 +636,7 @@ checkBuyOrderStatus = () => {
       client.myTrades({ symbol: pair, limit: 1, recvWindow: 1000000 }).then( mytrade => {
         buy_price = parseFloat(mytrade[0].price)
         console.log(chalk.gray(" FINAL BUY PRICE @ ") + chalk.cyan(buy_price))
-        if (selling_method==="Trailing") {
+        if (selling_method === SELL_TRAILING) {
           stop_price = (buy_price - (buy_price * trailing_pourcent / 100.00)).toFixed(tickSize)
           loss_price = (stop_price - (stop_price * 0.040)).toFixed(tickSize)
           set_stop_loss_order()
