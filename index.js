@@ -133,6 +133,14 @@ var buy_info_request = [
 
 const report = ora(chalk.grey('Starting the trade...'))
 
+log = (msg, data) => {
+  if (data) {
+    console.log(chalk.green('[LOG] ' + msg, data))
+  } else {
+    console.log(chalk.green('[LOG] ' + msg))
+  }
+}
+
 ask_pair_budget = () => {
   inquirer.prompt(buy_info_request).then(answers => {
     pair = (answers.currency_to_buy + answers.base_currency).toUpperCase()
@@ -167,28 +175,23 @@ ask_pair_budget = () => {
         let lotSizeFilter = lotSizeFilterArr[0]
 
         //console.log('Symbol:', symbol)
-        //console.log('[0]', symbol.filters[0])
-        //console.log('X', priceFilter)
-        //console.log('[2]', symbol.filters[2])
-        //console.log('[Y]', lotSizeFilter)
 
         setTitle('🐬 ' + pair + ' 🐬 ')
-        tickSize = _.filter(results.symbols, {symbol: pair})[0].filters[0].tickSize.indexOf("1") - 1
-        stepSize = _.filter(results.symbols, {symbol: pair})[0].filters[2].stepSize
-        let tickSize2 = priceFilter.tickSize.indexOf("1") - 1
-        let stepSize2 = symbol.filters[2].stepSize
+        tickSize = priceFilter.tickSize.indexOf("1") - 1
+        stepSize = lotSizeFilter.stepSize
 
-        console.log(`tickSize: ${tickSize}; stepSize: ${stepSize}`)
-        console.log(`tickSize2: ${tickSize2}; stepSize2: ${stepSize2}`)
+        log(`tickSize: ${tickSize}; stepSize: ${stepSize}`)
 
         // GET ORDER BOOK
         client.book({ symbol: pair }).then(results => {
           // SO WE CAN TRY TO BUY AT THE 1ST BID PRICE + %0.02:
           bid_price = parseFloat(results.bids[0].price)
           ask_price = parseFloat(results.asks[0].price)
-          console.log( chalk.grey(moment().format('h:mm:ss').padStart(8))
-            + chalk.yellow(pair.padStart(10))
-            + chalk.grey(" CURRENT 1ST BID PRICE: " + bid_price ))
+          console.log( chalk.grey(moment().format('h:mm:ss').padStart(8)) + chalk.yellow(pair.padStart(10)) + chalk.grey(" CURRENT 1ST BID PRICE: " + bid_price ))
+          console.log( chalk.grey('        ' + chalk.yellow(pair.padStart(10)) + chalk.grey(" CURRENT 1ST ASK  PRICE: " + ask_price )))
+          let price_diff = ask_price - bid_price
+          let price_diff_pr = price_diff / bid_price * 100
+          console.log(chalk.grey('        ' + chalk.yellow(("   DIFF: ") + chalk.greyprice_diff_pr + " | " + numeral(price_diff_pr).format("0.0000") + " %")))
           fixed_buy_price_input[0].default = results.bids[0].price
           ask_buy_sell_options()
         })
