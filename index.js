@@ -75,6 +75,9 @@ const BUY_MARKET = "Market"
 const SELL_PROFIT = "Profit"
 const SELL_TRAILING = "Trailing"
 
+// just above
+const JUST_ABOBE = 1.0002
+
 //////////////////////////////////////////////////////////////////////////////////
 
 // Binance API initialization //
@@ -160,6 +163,7 @@ ask_pair_budget = () => {
       // CHECK IF PAIR IS UNKNOWN:
       if (_.filter(results.symbols, {symbol: pair}).length > 0) {
         let symbol = _.filter(results.symbols, {symbol: pair})[0]
+        console.log('Symbol:', symbol)
         let priceFilterArr = _.filter(symbol.filters, {filterType: 'PRICE_FILTER'})
         if (!priceFilterArr.length) {
           console.log(chalk.red('SymbolFilter(\'PRICE_FILTER\' not found in symbol: ' + symbol.symbol))
@@ -396,8 +400,8 @@ start_trading = () => {
     })
   }
   else if (buying_method === BUY_BID) {
-    buy_amount = (( ((parseFloat(budget) / (parseFloat(bid_price) * 1.0002)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
-    buy_price = parseFloat(bid_price) * 1.0002
+    buy_amount = (( ((parseFloat(budget) / (parseFloat(bid_price) * JUST_ABOBE)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
+    buy_price = parseFloat(bid_price) * JUST_ABOBE
     console.log(chalk.grey("BUYING " + buy_amount + " OF " + currency_to_buy + " AT JUST ABOVE 1ST BID PRICE ") + chalk.green(buy_price.toFixed(tickSize)))
     client.order({
       symbol: pair,
@@ -417,7 +421,7 @@ start_trading = () => {
     })
   }
   else if (buying_method === BUY_MARKET) {
-    buy_amount = (( ((parseFloat(budget) / (parseFloat(ask_price) * 1.0002)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
+    buy_amount = (( ((parseFloat(budget) / (parseFloat(ask_price) * JUST_ABOBE)) / parseFloat(stepSize)) | 0 ) * parseFloat(stepSize)).toFixed(precision)
     buy_price = parseFloat(ask_price)
     console.log(chalk.green("BUYING " + buy_amount + " OF " + currency_to_buy + " AT MARKET PRICE" ))
     client.order({
