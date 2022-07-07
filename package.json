@@ -30,7 +30,7 @@
     "fs": "^0.0.1-security",
     "inquirer": "^6.2.0",
     "lodash": "^4.17.11",
-    "moment": "^2.22.2",
+    "moment": "^2.29.4",
     "node-bash-title": "^0.0.2",
     "numeral": "^2.0.6",
     "ora": "^3.0.0",
